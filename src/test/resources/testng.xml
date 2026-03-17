@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd">
+<suite name="移动宽带系统_自动化测试套件">
+
+    <test name="UI_核心业务测试">
+        <classes>
+            <class name="com.broadband.ui.E2E_UserJourneyTest"/>
+        </classes>
+    </test>
+</suite>
