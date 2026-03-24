@@ -8,8 +8,7 @@ public class OrderDataConsistencyTest {
 
     @Test(description = "验证 sys_order 表中真实数据的一致性")
     public void verifyOrderDataConsistency() {
-        // 1. 这里模拟你在 UI 或 API 操作后的预期值
-        // 我们以你截图里的“平星宇”这条数据为例
+        // 1. 模拟你在 UI 或 API 操作后的预期值
         String username = "平星宇";
         String expectedPackageName = "59元套餐";
         BigDecimal expectedFee = new BigDecimal("59.00");
