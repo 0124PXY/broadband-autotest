@@ -6,8 +6,8 @@ pipeline {
         BASE_URL = 'http://host.docker.internal:8080'
         BACKEND_URL = 'http://host.docker.internal:9090'
 
-        // 如果你按建议启动了 selenium/standalone-chrome，并映射到宿主机 4444 端口，就打开这一行
-        SELENIUM_REMOTE_URL = 'http://host.docker.internal:4444/wd/hub'
+        // 推荐：让 my-jenkins 与 selenium-chrome 处于同一 Docker network 后，直接用容器名访问
+        SELENIUM_REMOTE_URL = 'http://selenium-chrome:4444/wd/hub'
     }
 
     // 每天触发一次 Daily Build（建议结合时区/峰值调整 cron 时间）
