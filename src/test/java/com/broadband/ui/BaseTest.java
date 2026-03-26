@@ -13,6 +13,9 @@ import java.time.Duration;
 
 public class BaseTest {
 
+    // 被测前端地址：建议仅在这里改一次，其他测试统一引用该常量
+    public static final String BASE_URL = "http://host.docker.internal:8080";
+
     // 声明为 static，保证整个测试套件共享同一个浏览器实例
     protected static WebDriver driver;
     protected static WebDriverWait wait;

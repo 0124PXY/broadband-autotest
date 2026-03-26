@@ -21,7 +21,6 @@ public class E2E_UserJourneyTest extends BaseTest {
     // 存当前生成的用户名
     private String currentUsername;
     private final String currentPassword = "Password123!";
-    private final String baseUrl = System.getenv().getOrDefault("BASE_URL", "http://localhost:8080");
 
     @BeforeClass
     public void initData() {
@@ -33,7 +32,7 @@ public class E2E_UserJourneyTest extends BaseTest {
 
     @Test
     public void test01_Register() {
-        driver.get(baseUrl + "/page/login.html");
+        driver.get(BASE_URL + "/page/login.html");
         // 打印当前 URL 便于确认页面是否真的加载到了登录页
         System.out.println("当前URL: " + driver.getCurrentUrl());
 
@@ -101,7 +100,7 @@ public class E2E_UserJourneyTest extends BaseTest {
 
     @Test(dependsOnMethods = "test01_Register")
     public void test02_Login() {
-        driver.get(baseUrl + "/page/login.html");
+        driver.get(BASE_URL + "/page/login.html");
 
         // 填表
         WebElement usernameInput = wait.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector("input[type='text']")));
@@ -118,7 +117,7 @@ public class E2E_UserJourneyTest extends BaseTest {
         // 🟢 你的兜底逻辑：Force Navigation
         if (driver.getCurrentUrl().contains("login")) {
             System.out.println("⚠️ 检测到未自动跳转，执行强制跳转兜底...");
-            driver.get(baseUrl + "/front/home");
+            driver.get(BASE_URL + "/front/home");
             sleep(1000);
         }
 
@@ -129,7 +128,7 @@ public class E2E_UserJourneyTest extends BaseTest {
 
     @Test(dependsOnMethods = "test02_Login")
     public void test03_SelectPackage() {
-        driver.get(baseUrl + "/front/Bandwidth");
+        driver.get(BASE_URL + "/front/Bandwidth");
 
         // 下单
         WebElement orderBtn = wait.until(ExpectedConditions.visibilityOfElementLocated(
@@ -155,7 +154,7 @@ public class E2E_UserJourneyTest extends BaseTest {
 
     @Test(dependsOnMethods = "test03_SelectPackage")
     public void test04_Pay() {
-        driver.get(baseUrl + "/front/Order");
+        driver.get(BASE_URL + "/front/Order");
 
         // 支付
         WebElement payBtn = wait.until(ExpectedConditions.visibilityOfElementLocated(
