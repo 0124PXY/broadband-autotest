@@ -1,6 +1,15 @@
 pipeline {
     agent any
 
+    environment {
+        // 让 Jenkins 容器访问宿主机上的前端/后端服务（Docker Desktop 通常可用 host.docker.internal）
+        BASE_URL = 'http://host.docker.internal:8080'
+        BACKEND_URL = 'http://host.docker.internal:9090'
+
+        // 如果你按建议启动了 selenium/standalone-chrome，并映射到宿主机 4444 端口，就打开这一行
+        SELENIUM_REMOTE_URL = 'http://host.docker.internal:4444/wd/hub'
+    }
+
     // 每天触发一次 Daily Build（建议结合时区/峰值调整 cron 时间）
     triggers {
         cron('H H * * *')

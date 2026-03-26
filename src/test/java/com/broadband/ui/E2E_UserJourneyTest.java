@@ -15,6 +15,7 @@ public class E2E_UserJourneyTest extends BaseTest {
     // 存当前生成的用户名
     private String currentUsername;
     private final String currentPassword = "Password123!";
+    private final String baseUrl = System.getenv().getOrDefault("BASE_URL", "http://localhost:8080");
 
     @BeforeClass
     public void initData() {
@@ -26,7 +27,7 @@ public class E2E_UserJourneyTest extends BaseTest {
 
     @Test
     public void test01_Register() {
-        driver.get("http://localhost:8080/page/login.html");
+        driver.get(baseUrl + "/page/login.html");
 
         // 点击注册
         WebElement registerLink = wait.until(ExpectedConditions.elementToBeClickable(By.xpath("//*[contains(text(),'注册')]")));
@@ -50,7 +51,7 @@ public class E2E_UserJourneyTest extends BaseTest {
 
     @Test(dependsOnMethods = "test01_Register")
     public void test02_Login() {
-        driver.get("http://localhost:8080/page/login.html");
+        driver.get(baseUrl + "/page/login.html");
 
         // 填表
         WebElement usernameInput = wait.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector("input[type='text']")));
@@ -67,7 +68,7 @@ public class E2E_UserJourneyTest extends BaseTest {
         // 🟢 你的兜底逻辑：Force Navigation
         if (driver.getCurrentUrl().contains("login")) {
             System.out.println("⚠️ 检测到未自动跳转，执行强制跳转兜底...");
-            driver.get("http://localhost:8080/front/home");
+            driver.get(baseUrl + "/front/home");
             sleep(1000);
         }
 
@@ -78,7 +79,7 @@ public class E2E_UserJourneyTest extends BaseTest {
 
     @Test(dependsOnMethods = "test02_Login")
     public void test03_SelectPackage() {
-        driver.get("http://localhost:8080/front/Bandwidth");
+        driver.get(baseUrl + "/front/Bandwidth");
 
         // 下单
         WebElement orderBtn = wait.until(ExpectedConditions.visibilityOfElementLocated(
@@ -104,7 +105,7 @@ public class E2E_UserJourneyTest extends BaseTest {
 
     @Test(dependsOnMethods = "test03_SelectPackage")
     public void test04_Pay() {
-        driver.get("http://localhost:8080/front/Order");
+        driver.get(baseUrl + "/front/Order");
 
         // 支付
         WebElement payBtn = wait.until(ExpectedConditions.visibilityOfElementLocated(

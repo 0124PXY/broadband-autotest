@@ -3,10 +3,12 @@ package com.broadband.ui;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.remote.RemoteWebDriver;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeSuite;
 
+import java.net.URL;
 import java.time.Duration;
 
 public class BaseTest {
@@ -23,14 +25,26 @@ public class BaseTest {
         options.addArguments("--start-maximized"); // 本地调试用
 
         // 🟢【Jenkins 关键配置】
-//         如果是在 Jenkins/Linux 服务器跑，必须解开下面这几行的注释：
-         options.addArguments("--headless"); // 无头模式，不显示浏览器界面
-         options.addArguments("--no-sandbox"); // Linux 必备
-         options.addArguments("--disable-dev-shm-usage"); // 防止内存溢出
-         options.addArguments("--window-size=1920,1080"); // 指定分辨率，防止元素挤压不可见
+        options.addArguments("--headless=new"); // 无头模式（容器更稳定）
+        options.addArguments("--no-sandbox"); // Linux/容器常用
+        options.addArguments("--disable-dev-shm-usage"); // 防止 /dev/shm 太小导致崩溃
+        options.addArguments("--window-size=1920,1080"); // 指定分辨率，防止元素挤压不可见
 
         // 2. 启动驱动
-        driver = new ChromeDriver(options);
+        // 推荐：CI（Jenkins Docker）里使用远程 Selenium（Standalone Chrome / Grid）
+        // 用环境变量注入，例如：
+        // SELENIUM_REMOTE_URL=http://host.docker.internal:4444/wd/hub
+        String remoteUrl = System.getenv("SELENIUM_REMOTE_URL");
+        if (remoteUrl != null && !remoteUrl.isBlank()) {
+            try {
+                driver = new RemoteWebDriver(new URL(remoteUrl), options);
+            } catch (Exception e) {
+                throw new RuntimeException("连接远程 Selenium 失败: " + remoteUrl, e);
+            }
+        } else {
+            // 本地模式：要求运行环境已安装 Chrome + chromedriver
+            driver = new ChromeDriver(options);
+        }
 
         // 3. 全局隐式等待 (找元素最长等 5 秒)
         driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5));
