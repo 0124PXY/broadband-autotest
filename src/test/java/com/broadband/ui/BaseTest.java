@@ -50,7 +50,8 @@ public class BaseTest {
         driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5));
 
         // 4. 显式等待 (用于复杂交互)
-        wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+        // CI 环境比本地慢，适当加大等待时间更稳
+        wait = new WebDriverWait(driver, Duration.ofSeconds(20));
     }
 
     @AfterSuite

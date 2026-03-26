@@ -76,27 +76,35 @@ pipeline {
                 def reportDir = 'target/surefire-reports'
 
                 if (fileExists(reportDir)) {
-                    emailext(
-                        to: params.RECIPIENTS,
-                        subject: "[Jenkins] ${env.JOB_NAME} #${env.BUILD_NUMBER} - ${result}",
-                        body: """
-                            <p>构建结果：<b>${result}</b></p>
-                            <p>构建链接：<a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
-                            <p>测试报告：已归档到 <code>${reportDir}/</code>（并附带 HTML）</p>
-                        """,
-                        // 只附带 HTML 报告，避免附件过大/匹配规则差异导致失败
-                        attachmentsPattern: "${reportDir}/**/*.html"
-                    )
+                    try {
+                        emailext(
+                            to: params.RECIPIENTS,
+                            subject: "[Jenkins] ${env.JOB_NAME} #${env.BUILD_NUMBER} - ${result}",
+                            body: """
+                                <p>构建结果：<b>${result}</b></p>
+                                <p>构建链接：<a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+                                <p>测试报告：已归档到 <code>${reportDir}/</code>（并附带 HTML）</p>
+                            """,
+                            // 只附带 HTML 报告，避免附件过大/匹配规则差异导致失败
+                            attachmentsPattern: "${reportDir}/**/*.html"
+                        )
+                    } catch (e) {
+                        echo "邮件发送失败（忽略不影响构建结果）：${e}"
+                    }
                 } else {
-                    emailext(
-                        to: params.RECIPIENTS,
-                        subject: "[Jenkins] ${env.JOB_NAME} #${env.BUILD_NUMBER} - ${result}",
-                        body: """
-                            <p>构建结果：<b>${result}</b></p>
-                            <p>构建链接：<a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
-                            <p>测试报告：未检测到 <code>${reportDir}/</code>（可能是编译/执行阶段未生成）</p>
-                        """
-                    )
+                    try {
+                        emailext(
+                            to: params.RECIPIENTS,
+                            subject: "[Jenkins] ${env.JOB_NAME} #${env.BUILD_NUMBER} - ${result}",
+                            body: """
+                                <p>构建结果：<b>${result}</b></p>
+                                <p>构建链接：<a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+                                <p>测试报告：未检测到 <code>${reportDir}/</code>（可能是编译/执行阶段未生成）</p>
+                            """
+                        )
+                    } catch (e) {
+                        echo "邮件发送失败（忽略不影响构建结果）：${e}"
+                    }
                 }
             }
         }
