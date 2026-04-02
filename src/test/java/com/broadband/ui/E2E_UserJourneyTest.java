@@ -1,5 +1,6 @@
 package com.broadband.ui;
 
+import com.broadband.utils.DBUtil;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedConditions;
@@ -9,6 +10,7 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import java.math.BigDecimal;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
@@ -21,13 +23,14 @@ public class E2E_UserJourneyTest extends BaseTest {
     // 存当前生成的用户名
     private String currentUsername;
     private final String currentPassword = "Password123!";
+    protected static String currentPackageName;
 
     @BeforeClass
     public void initData() {
         // 生成随机用户名
         int randomNum = (int) (Math.random() * 900) + 100;
         currentUsername = "User" + randomNum;
-        System.out.println("🚀 [Jenkins] 当前测试用户名: " + currentUsername);
+        System.out.println("[Jenkins] 当前测试用户名: " + currentUsername);
     }
 
     @Test
@@ -37,8 +40,7 @@ public class E2E_UserJourneyTest extends BaseTest {
         System.out.println("当前URL: " + driver.getCurrentUrl());
 
         // 点击注册
-        // normalize-space 兼容 ElementUI/Vue 可能导致文本两端有空格/换行
-        String registerXpath = "//*[contains(normalize-space(.),'注册')]";
+        String registerXpath = "//button[contains(., '注') and contains(., '册')]";
         try {
             WebElement registerLink = wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath(registerXpath)));
             // 滚动到可视区域，避免“不可点击/被遮挡”问题
@@ -116,7 +118,7 @@ public class E2E_UserJourneyTest extends BaseTest {
 
         // 🟢 你的兜底逻辑：Force Navigation
         if (driver.getCurrentUrl().contains("login")) {
-            System.out.println("⚠️ 检测到未自动跳转，执行强制跳转兜底...");
+            System.out.println("登陆失败，未跳转到首页，还在登录页");
             driver.get(BASE_URL + "/front/home");
             sleep(1000);
         }
@@ -136,18 +138,46 @@ public class E2E_UserJourneyTest extends BaseTest {
         ));
         orderBtn.click();
 
-        sleep(1000); // 等弹窗动画
+        // ... 前面的点击“下单”按钮代码保持不变 ...
+        sleep(1000); // 等待弹窗动画完全展开
 
-        // 填手机号
         try {
-            driver.findElement(By.xpath("//div[@class='el-dialog__body']//input")).sendKeys("13800138000");
+            // 🌟 1. 填【用户名】
+            // 强力特征定位：找前面 label 写着“用户名”的那个输入框！
+            WebElement usernameInput = wait.until(ExpectedConditions.visibilityOfElementLocated(
+                    By.xpath("//label[contains(.,'用户名')]/following-sibling::div//input")
+            ));
+            usernameInput.clear();
+            usernameInput.sendKeys(currentUsername);
+
+            // 🌟 2. 填【电话】
+            WebElement phoneInput = driver.findElement(
+                    By.xpath("//label[contains(.,'电话')]/following-sibling::div//input")
+            );
+            phoneInput.clear();
+            phoneInput.sendKeys("13800138000");
+
+            // 🌟 3. 填【地址】
+            WebElement addressInput = driver.findElement(
+                    By.xpath("//label[contains(.,'地址')]/following-sibling::div//input")
+            );
+            addressInput.clear();
+            addressInput.sendKeys("安徽省滁州市琅琊区滁州学院");
+
+            WebElement packageNameInput = wait.until(ExpectedConditions.visibilityOfElementLocated(
+                    By.xpath("//label[contains(.,'套餐名称')]/following-sibling::div//input")
+            ));
+            currentPackageName = packageNameInput.getAttribute("value");
+
         } catch (Exception e) {
-            // 忽略异常
+            System.out.println("⚠️ 弹窗表单填写失败，请检查定位器！");
+            throw e; // 如果填表失败，直接抛出异常中断测试
         }
 
-        // 确定
+        // 4. 点击【确定】按钮提交表单
         driver.findElement(By.cssSelector(".el-dialog__footer button.el-button--primary")).click();
 
+        // 5. 验证是否保存成功
         boolean isSuccess = wait.until(ExpectedConditions.textToBePresentInElementLocated(By.tagName("body"), "成功"));
         Assert.assertTrue(isSuccess, "下单保存失败");
     }
@@ -156,24 +186,60 @@ public class E2E_UserJourneyTest extends BaseTest {
     public void test04_Pay() {
         driver.get(BASE_URL + "/front/Order");
 
-        // 支付
-        WebElement payBtn = wait.until(ExpectedConditions.visibilityOfElementLocated(
-                By.xpath("(//button[contains(.,'支付')])[1]")
-        ));
-        payBtn.click();
+        //  1. 【动态提取金额】：智能锁定当前用户的行，拿第 6 列的价格！
+        String uiPriceText = "0.00";
+        try {
+            // 大白话：找一个 <tr> (行)，要求这行里的某个 <td> 包含当前用户名。然后取这行的第 6 个 <td> 里的 div
+            String priceXpath = "//tr[td[contains(., '" + currentUsername + "')]]/td[6]/div";
 
-        sleep(1000); // 等弹窗
+            WebElement priceElement = wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath(priceXpath)));
+            uiPriceText = priceElement.getText().trim();
+            System.out.println("【数据流追踪】成功锁定用户 " + currentUsername + " 的订单，抓取金额: " + uiPriceText);
+        } catch (Exception e) {
+            System.out.println("⚠️ 未能抓取到页面金额，请检查列数是否为第 6 列！");
+            dumpDebugToReports("test04_抓取金额失败");
+        }
 
-        // 确定
+        BigDecimal expectedFeeFromUI = new BigDecimal(uiPriceText);
+
+
+        //  2. 只点当前用户那行的支付按钮！
+        try {
+            // 大白话：在当前用户所在的那一行里，寻找“支付”按钮
+            String payBtnXpath = "//tr[td[contains(., '" + currentUsername + "')]]//button[contains(.,'支付')]";
+            WebElement payBtn = wait.until(ExpectedConditions.elementToBeClickable(By.xpath(payBtnXpath)));
+
+            // 使用 JS 点击法，防止 ElementUI 按钮被遮挡
+            ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("arguments[0].click();", payBtn);
+        } catch (Exception e) {
+            System.out.println("⚠️ 找不到该用户的支付按钮！");
+            throw e;
+        }
+
+        sleep(1000); // 等待弹窗出现
+
+        // 3. 点击弹窗上的【确定】
         WebElement confirmBtn = wait.until(ExpectedConditions.elementToBeClickable(
                 By.cssSelector(".el-message-box__btns button.el-button--primary")
         ));
         confirmBtn.click();
 
-        // 验证
+        // 3. 原有的 UI 表面验证（验证弹窗）
         boolean isPaid = wait.until(ExpectedConditions.textToBePresentInElementLocated(
                 By.className("el-message__content"), "成功"
         ));
-        Assert.assertTrue(isPaid, "支付失败");
+        Assert.assertTrue(isPaid, "支付失败弹窗未出现");
+        System.out.println("✅ UI层验证通过：前端已弹出支付成功提示。");
+
+        // 🌟 4. 【终极对账】：UI 跑完别急着结束，立刻呼叫 DBUtil 去底层查账！
+        System.out.println("🔍 开始执行底层数据一致性校验...");
+        DBUtil dbUtil = new DBUtil();
+
+        // 调用你之前写好的 verifyOrderConsistency 方法
+        // 参数1：刚才注册时生成的随机用户名 currentUsername
+        // 参数2：套餐名称（你可以写死，或者也用 getText() 抓下来）
+        // 参数3：刚刚从前端动态抓下来并转换的预期金额 expectedFeeFromUI
+        dbUtil.verifyOrderConsistency(currentUsername, currentPackageName, expectedFeeFromUI);
+        System.out.println("🎉 全链路闭环测试通过：前端展示金额与底层物理落库金额完全一致！");
     }
 }

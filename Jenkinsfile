@@ -2,15 +2,13 @@ pipeline {
     agent any
 
     environment {
-        // 让 Jenkins 容器访问宿主机上的前端/后端服务（Docker Desktop 通常可用 host.docker.internal）
+        // 🌟 1. 定义环境变量：被测前端系统地址（注意宿主机映射）宿主机端口 : 容器内部端口 8888/8080
         BASE_URL = 'http://host.docker.internal:8080'
-        BACKEND_URL = 'http://host.docker.internal:9090'
 
-        // 推荐：让 my-jenkins 与 selenium-chrome 处于同一 Docker network 后，直接用容器名访问
+        // 🌟 2. 远程 Selenium 节点地址
         SELENIUM_REMOTE_URL = 'http://selenium-chrome:4444/wd/hub'
     }
 
-    // 每天触发一次 Daily Build（建议结合时区/峰值调整 cron 时间）
     triggers {
         cron('H H * * *')
     }
@@ -21,7 +19,6 @@ pipeline {
 
     options {
         timestamps()
-        // 构建失败也继续执行 post 阶段，便于发报告
         skipStagesAfterUnstable()
     }
 
@@ -35,7 +32,6 @@ pipeline {
         stage('1.1 Maven工具初始化') {
             steps {
                 script {
-                    // 使用 Jenkins 全局工具配置中的 Maven（名称：maven3）
                     env.MVN_HOME = tool 'maven3'
                     env.PATH = "${env.MVN_HOME}/bin:${env.PATH}"
                     sh 'mvn -v'
@@ -45,16 +41,22 @@ pipeline {
 
         stage('2. 环境准备') {
             steps {
-                // 你的 Jenkins 实际运行在 Linux 容器中，因此统一使用 sh 执行 Maven
                 sh 'mvn -B -U -Dfile.encoding=UTF-8 clean'
             }
         }
 
         stage('3. 执行测试套件') {
             steps {
-                echo '正在启动自动化测试框架...'
-                // pom.xml 会自动读取 src/test/resources/testng.xml
-                sh 'mvn -B -U -Dfile.encoding=UTF-8 test'
+                echo '正在启动自动化测试框架 (CI/CD 模式)...'
+                // 🌟 核心修改：
+                // 1. 必须用双引号 """，这样 Groovy 才能把 ${BASE_URL} 替换成真实地址
+                // 2. 通过 -D 把 env.url 和 headless=true 传递给底层的 BaseTest.java
+                sh """
+                mvn -B -U -Dfile.encoding=UTF-8 \
+                    -Denv.url=${BASE_URL} \
+                    -Dheadless=true \
+                    test
+                """
             }
         }
     }
@@ -64,29 +66,22 @@ pipeline {
             script {
                 def result = currentBuild.currentResult ?: 'UNKNOWN'
 
-                // 1) JUnit 插件：解析 surefire-reports 下的 XML，生成可视化测试报告
-                //    allowEmptyResults：避免“未生成 XML”导致 post 阶段直接报错
                 junit testResults: 'target/surefire-reports/**/*.xml', allowEmptyResults: true
-
-                // 2) 归档整个报告目录（包含 HTML/LOG 等），便于回溯
                 archiveArtifacts artifacts: 'target/surefire-reports/**/*.*', allowEmptyArchive: true
 
-                // 3) 邮件通知：发送构建结果 + 报告链接，并附上 HTML 报告（可选）
-                //    依赖：需要 Jenkins 已安装并配置 Email Extension Plugin + SMTP 服务
                 def reportDir = 'target/surefire-reports'
 
                 if (fileExists(reportDir)) {
                     try {
                         emailext(
-                            to: params.RECIPIENTS,
-                            subject: "[Jenkins] ${env.JOB_NAME} #${env.BUILD_NUMBER} - ${result}",
-                            body: """
+                                to: params.RECIPIENTS,
+                                subject: "[Jenkins] ${env.JOB_NAME} #${env.BUILD_NUMBER} - ${result}",
+                                body: """
                                 <p>构建结果：<b>${result}</b></p>
                                 <p>构建链接：<a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
                                 <p>测试报告：已归档到 <code>${reportDir}/</code>（并附带 HTML）</p>
                             """,
-                            // 只附带 HTML 报告，避免附件过大/匹配规则差异导致失败
-                            attachmentsPattern: "${reportDir}/**/*.html"
+                                attachmentsPattern: "${reportDir}/**/*.html"
                         )
                     } catch (e) {
                         echo "邮件发送失败（忽略不影响构建结果）：${e}"
@@ -94,16 +89,16 @@ pipeline {
                 } else {
                     try {
                         emailext(
-                            to: params.RECIPIENTS,
-                            subject: "[Jenkins] ${env.JOB_NAME} #${env.BUILD_NUMBER} - ${result}",
-                            body: """
+                                to: params.RECIPIENTS,
+                                subject: "[Jenkins] ${env.JOB_NAME} #${env.BUILD_NUMBER} - ${result}",
+                                body: """
                                 <p>构建结果：<b>${result}</b></p>
                                 <p>构建链接：<a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
                                 <p>测试报告：未检测到 <code>${reportDir}/</code>（可能是编译/执行阶段未生成）</p>
                             """
                         )
                     } catch (e) {
-                        echo "邮件发送失败（忽略不影响构建结果）：${e}"
+                        echo "邮件发送失败 ：${e}"
                     }
                 }
             }

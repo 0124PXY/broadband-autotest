@@ -13,8 +13,9 @@ import java.time.Duration;
 
 public class BaseTest {
 
-    // 被测前端地址：建议仅在这里改一次，其他测试统一引用该常量
-    public static final String BASE_URL = "http://host.docker.internal:8080";
+    // 被测前端地址
+    // 🌟 核心大招：动态读取系统变量。如果读不到（本地），就默认用 localhost
+    public static final String BASE_URL = System.getProperty("env.url", "http://localhost:8080");
 
     // 声明为 static，保证整个测试套件共享同一个浏览器实例
     protected static WebDriver driver;
@@ -22,21 +23,29 @@ public class BaseTest {
 
     @BeforeSuite
     public void setUp() {
-        // 1. 设置 Chrome 选项 (Jenkins 必备配置)
+        // 1. 设置 Chrome 选项
         ChromeOptions options = new ChromeOptions();
         options.addArguments("--remote-allow-origins=*");
-        options.addArguments("--start-maximized"); // 本地调试用
+        // 分辨率无论是无头还是本地都建议加上，保证渲染的页面结构一致
+        options.addArguments("--window-size=1920,1080");
 
-        // 🟢【Jenkins 关键配置】
-        options.addArguments("--headless=new"); // 无头模式（容器更稳定）
-        options.addArguments("--no-sandbox"); // Linux/容器常用
-        options.addArguments("--disable-dev-shm-usage"); // 防止 /dev/shm 太小导致崩溃
-        options.addArguments("--window-size=1920,1080"); // 指定分辨率，防止元素挤压不可见
+        // 🌟 核心魔法：读取 Maven 传进来的环境变量。默认是 false（可视化）
+        boolean isHeadless = Boolean.parseBoolean(System.getProperty("headless", "false"));
+
+        if (isHeadless) {
+            System.out.println("🐳 [CI/CD 环境] 启动 Chrome 无头模式...");
+            // 🟢【Jenkins 关键配置】
+            options.addArguments("--headless=new");
+            options.addArguments("--no-sandbox");
+            options.addArguments("--disable-dev-shm-usage");
+        } else {
+            System.out.println("🖥️ [本地调试] 启动可视化 Chrome 浏览器...");
+            // 本地调试时，开启界面并最大化窗口
+            options.addArguments("--start-maximized");
+        }
 
         // 2. 启动驱动
         // 推荐：CI（Jenkins Docker）里使用远程 Selenium（Standalone Chrome / Grid）
-        // 用环境变量注入，例如：
-        // SELENIUM_REMOTE_URL=http://host.docker.internal:4444/wd/hub
         String remoteUrl = System.getenv("SELENIUM_REMOTE_URL");
         if (remoteUrl != null && !remoteUrl.isBlank()) {
             try {
@@ -53,7 +62,6 @@ public class BaseTest {
         driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5));
 
         // 4. 显式等待 (用于复杂交互)
-        // CI 环境比本地慢，适当加大等待时间更稳
         wait = new WebDriverWait(driver, Duration.ofSeconds(20));
     }
 

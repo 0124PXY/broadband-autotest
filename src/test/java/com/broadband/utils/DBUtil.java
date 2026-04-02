@@ -1,64 +1,71 @@
 package com.broadband.utils;
 
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 import java.math.BigDecimal;
-import java.util.Map;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 
 public class DBUtil {
-    private static final String DB_URL = "jdbc:mysql://localhost:3306/pxy?serverTimezone=GMT%2b8";
-    private static final String DB_USER = "root";
-    private static final String DB_PWD = "0502pxyzy";
-    private static final String DB_DRIVER = "com.mysql.cj.jdbc.Driver";
 
-    private final JdbcTemplate jdbcTemplate;
+    // 声明 Hikari 数据源
+    private static HikariDataSource dataSource;
 
-    public DBUtil() {
-        DriverManagerDataSource dataSource = new DriverManagerDataSource();
-        dataSource.setDriverClassName(DB_DRIVER);
-        dataSource.setUrl(DB_URL);
-        dataSource.setUsername(DB_USER);
-        dataSource.setPassword(DB_PWD);
-        this.jdbcTemplate = new JdbcTemplate(dataSource);
+    // 使用静态代码块，确保只在类加载时初始化一次连接池
+    static {
+        HikariConfig config = new HikariConfig();
+        config.setJdbcUrl("jdbc:mysql://localhost:3306/pxy?useSSL=false&serverTimezone=UTC&characterEncoding=utf8");
+        config.setUsername("root");
+        config.setPassword("0502pxyzy");
+
+        config.setMaximumPoolSize(10); // 自动化测试并发不高，10个连接绰绰有余
+        config.setMinimumIdle(2);      // 最小空闲连接数
+        config.setIdleTimeout(30000);  // 空闲连接存活时间
+        config.addDataSourceProperty("cachePrepStmts", "true"); // 开启预编译缓存，提升验证查询速度
+        config.addDataSourceProperty("prepStmtCacheSize", "250");
+
+        // 实例化数据源
+        dataSource = new HikariDataSource(config);
     }
 
     /**
-     * 适配 sys_order 表的查询逻辑
+     * 对外提供获取连接的方法
      */
-    public Map<String, Object> getLatestOrderByUsername(String username) {
-        String sql = "SELECT name, fee FROM sys_order WHERE username = ? ORDER BY create_time DESC LIMIT 1";
-        try {
-            return jdbcTemplate.queryForMap(sql, username);
-        } catch (Exception e) {
-            throw new RuntimeException("【缺陷定位】sys_order 表中未找到用户 [" + username + "] 的记录。建议检查前端是否成功调用存盘接口。");
-        }
+    public static Connection getConnection() throws SQLException {
+        // 从池中“借用”一个连接，而不是新建
+        return dataSource.getConnection();
     }
 
     /**
-     对比套餐名称和费用
+     * 你的核心断言方法：利用 SQL 追踪数据流向
      */
-    public void verifyOrderConsistency(String username, String expectedName, BigDecimal expectedFee) {
-        Map<String, Object> actual = getLatestOrderByUsername(username);
+    public void verifyOrderConsistency(String username, String expectedPackage, BigDecimal expectedFee) {
+        String sql = "SELECT name, fee FROM sys_order WHERE username = ? ORDER BY id DESC LIMIT 1";
 
-        String actName = (String) actual.get("name");
-        BigDecimal actFee = (BigDecimal) actual.get("fee");
+        // try-with-resources 语法：执行完毕后会自动调用 conn.close()
+        // 注意：在 HikariCP 中，conn.close() 不是断开物理连接，而是将连接“归还”给连接池
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
-        StringBuilder errorMsg = new StringBuilder("\n=== [数据一致性缺陷报告] ===\n");
-        boolean hasError = false;
+            pstmt.setString(1, username);
 
-        if (!expectedName.equals(actName)) {
-            errorMsg.append(String.format("【套餐名错误】预期: %s, 实际: %s. 建议: 检查套餐选择组件的 ID 与 Name 映射关系。\n", expectedName, actName));
-            hasError = true;
-        }
-        if (expectedFee.compareTo(actFee) != 0) {
-            errorMsg.append(String.format("【金额错误】预期: %s, 实际: %s. 建议: 检查后端计算 Fee 的逻辑是否存在精度丢失或配置错误。\n", expectedFee, actFee));
-            hasError = true;
-        }
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    String actualPackage = rs.getString("name");
+                    BigDecimal actualFee = rs.getBigDecimal("fee");
 
-        if (hasError) {
-            throw new AssertionError(errorMsg.toString());
-        } else {
-            System.out.println(">>> [校验通过] 用户 " + username + " 的订单数据一致！(套餐:" + actName + ", 金额:" + actFee + ")");
+                    if (!expectedPackage.equals(actualPackage) || expectedFee.compareTo(actualFee) != 0) {
+                        throw new AssertionError("【数据一致性缺陷】期望套餐: " + expectedPackage + ", 实际套餐: " + actualPackage);
+                    }
+                    System.out.println("✅ [HikariCP 池化校验] 数据库底层闭环验证通过！用户：" + username);
+                } else {
+                    throw new AssertionError("【数据丢失缺陷】未查到用户 " + username + " 的落库订单，存在静默回滚风险！");
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("数据库校验执行异常: " + e.getMessage());
         }
     }
 }
