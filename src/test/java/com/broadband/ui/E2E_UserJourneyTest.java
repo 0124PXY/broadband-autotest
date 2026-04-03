@@ -75,8 +75,13 @@ public class E2E_UserJourneyTest extends BaseTest {
         driver.findElement(By.xpath("//button[contains(.,'注册')]")).click();
 
         // 验证
-        boolean isSuccess = wait.until(ExpectedConditions.textToBePresentInElementLocated(By.tagName("body"), "成功"));
-        Assert.assertTrue(isSuccess, "注册失败");
+        // 1. 验证：等待绿色的成功弹窗出现，并把它抓取存放到 WebElement 变量里
+        WebElement successToast = wait.until(ExpectedConditions.visibilityOfElementLocated(
+                By.cssSelector(".el-message.el-message--success")
+        ));
+
+        // 2. 断言：既然抓到了，我们就验证一下它是不是真的在页面上显示出来了
+        Assert.assertTrue(successToast.isDisplayed(), "注册失败");
     }
 
     private void dumpDebugToReports(String stepName) {
