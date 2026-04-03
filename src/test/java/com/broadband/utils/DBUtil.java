@@ -16,7 +16,7 @@ public class DBUtil {
     // 使用静态代码块，确保只在类加载时初始化一次连接池
     static {
         HikariConfig config = new HikariConfig();
-        config.setJdbcUrl("jdbc:mysql://localhost:3306/pxy?useSSL=false&serverTimezone=UTC&characterEncoding=utf8");
+        config.setJdbcUrl("jdbc:mysql://192.168.78.173:3306/pxy?useSSL=false&serverTimezone=UTC&characterEncoding=utf8");
         config.setUsername("root");
         config.setPassword("0502pxyzy");
 
