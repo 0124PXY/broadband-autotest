@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         // 🌟 1. 定义环境变量：被测前端系统地址（注意宿主机映射）宿主机端口 : 容器内部端口 8888/8080
-        BASE_URL = 'http://192.168.78.173:80801'
+        BASE_URL = 'http://192.168.78.173:8080'
 
         // 🌟 2. 远程 Selenium 节点地址
         SELENIUM_REMOTE_URL = 'http://selenium-chrome:4444/wd/hub'
