@@ -38,7 +38,10 @@ public class E2E_UserJourneyTest extends BaseTest {
         driver.get(BASE_URL + "/page/login.html");
         // 打印当前 URL 便于确认页面是否真的加载到了登录页
         System.out.println("当前URL: " + driver.getCurrentUrl());
+        System.out.println("【Debug天眼】当前网页标题: " + driver.getTitle());
 
+        String pageSource = driver.getPageSource();
+        System.out.println("【Debug天眼】网页源码前1000字:\n" + pageSource.substring(0, Math.min(pageSource.length(), 1000)));
         // 点击注册
         String registerXpath = "//button[contains(., '注') and contains(., '册')]";
         try {
