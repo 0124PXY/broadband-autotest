@@ -55,6 +55,7 @@ pipeline {
                 mvn -B -U -Dfile.encoding=UTF-8 \
                     -Denv.url=${BASE_URL} \
                     -Dheadless=true \
+                    -Dselenium.remote.url=${SELENIUM_REMOTE_URL} \
                     test
                 """
             }
